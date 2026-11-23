@@ -228,6 +228,20 @@ describe('StellarService', () => {
       expect(asset.issuer).toBe(USDC_ISSUER);
     });
 
+    it('rejects an invalid configured issuer before constructing USDC', () => {
+      const configured = service as unknown as {
+        networkConfig: StellarNetworkConfig;
+      };
+      const originalIssuer = configured.networkConfig.usdcIssuer;
+      configured.networkConfig.usdcIssuer = 'not-an-issuer';
+
+      expect(() => service.resolveAsset('USDC')).toThrow(
+        'Stellar asset issuer configuration is invalid.',
+      );
+
+      configured.networkConfig.usdcIssuer = originalIssuer;
+    });
+
     it('rejects unsupported assets', () => {
       expect(() => service.resolveAsset('BTC')).toThrow(BadRequestException);
     });
@@ -567,6 +581,25 @@ describe('StellarService', () => {
         hash: TX_HASH,
         failureCode: STELLAR_ERROR.TX_FAILED,
       });
+    });
+
+    it('stops after the first terminal failure instead of polling again', async () => {
+      transactionCall.mockResolvedValue({
+        successful: false,
+        hash: TX_HASH,
+        ledger_attr: 777,
+      });
+
+      await expect(
+        service.pollTransactionStatus(TX_HASH, {
+          intervalMs: 100,
+          maxAttempts: 5,
+        }),
+      ).resolves.toMatchObject({
+        confirmed: false,
+        failureCode: STELLAR_ERROR.TX_FAILED,
+      });
+      expect(transactionCall).toHaveBeenCalledTimes(1);
     });
 
     it('returns STELLAR_TIMEOUT after bounded not-found polling', async () => {

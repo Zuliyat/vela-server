@@ -161,6 +161,11 @@ export class StellarService {
       case 'XLM':
         return Asset.native();
       case 'USDC':
+        if (!StrKey.isValidEd25519PublicKey(this.networkConfig.usdcIssuer)) {
+          throw this.networkError(
+            'Stellar asset issuer configuration is invalid.',
+          );
+        }
         return new Asset('USDC', this.networkConfig.usdcIssuer);
       default:
         throw new BadRequestException({
